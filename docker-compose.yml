@@ -1,0 +1,7 @@
+services:
+  sql-agent:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - .:/app
