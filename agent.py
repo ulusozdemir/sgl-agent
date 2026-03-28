@@ -54,14 +54,15 @@ def select_database():
 @tool
 def create_chart(data_json: str) -> str:
     """
+    IMPORTANT: You MUST use the actual query results as values. Never use example or estimated values.
     Creates a chart from SQL query results and saves it as a PNG file.
-    Input must be JSON with keys: labels (list), values (list), title (str), xlabel (str), ylabel (str), chart_type (str: 'bar', 'line', 'pie').
-    Example: {"labels": ["A", "B"], "values": [10, 20], "title": "My Chart", "xlabel": "X", "ylabel": "Y", "chart_type": "bar"}
+    Input must be JSON with keys: labels (list of strings), values (list of actual numbers from query results), title (str), xlabel (str), ylabel (str), chart_type (str: 'bar', 'line', 'pie').
+    Example: {"labels": ["A", "B"], "values": [10.5, 20.3], "title": "My Chart", "xlabel": "X", "ylabel": "Y", "chart_type": "bar"}
     """
     try:
         data       = json.loads(data_json)
         labels     = data["labels"]
-        values     = data["values"]
+        values     = [float(v) for v in data["values"]] 
         title      = data.get("title", "Chart")
         xlabel     = data.get("xlabel", "")
         ylabel     = data.get("ylabel", "Value")
@@ -104,6 +105,76 @@ def create_chart(data_json: str) -> str:
 
     except Exception as e:
         return f"Error creating chart: {str(e)}"
+
+def generate_report(chat_history, db_name, chart_paths):
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
+    path = f"/app/reports/report_{timestamp}.pdf"
+
+    doc = SimpleDocTemplate(path, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Title"],
+        fontSize=22,
+        textColor=colors.HexColor("#2C3E50"),
+        spaceAfter=6
+    )
+    subtitle_style = ParagraphStyle(
+        "Subtitle",
+        parent=styles["Normal"],
+        fontSize=11,
+        textColor=colors.HexColor("#7F8C8D"),
+        spaceAfter=20
+    )
+    question_style = ParagraphStyle(
+        "Question",
+        parent=styles["Normal"],
+        fontSize=12,
+        textColor=colors.HexColor("#2980B9"),
+        fontName="Helvetica-Bold",
+        spaceBefore=14,
+        spaceAfter=6
+    )
+    answer_style = ParagraphStyle(
+        "Answer",
+        parent=styles["Normal"],
+        fontSize=11,
+        textColor=colors.HexColor("#2C3E50"),
+        spaceAfter=10,
+        leading=16
+    )
+
+    elements = []
+
+    elements.append(Paragraph("SQL Agent Report", title_style))
+    elements.append(Paragraph(
+        f"Database: {db_name} &nbsp;&nbsp;|&nbsp;&nbsp; Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        subtitle_style
+    ))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#BDC3C7")))
+    elements.append(Spacer(1, 0.5*cm))
+
+    for i, (question, answer) in enumerate(chat_history, 1):
+        elements.append(Paragraph(f"Q{i}: {question}", question_style))
+        elements.append(Paragraph(answer.replace("\n", "<br/>"), answer_style))
+        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ECF0F1")))
+
+    if chart_paths:
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph("Charts", title_style))
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#BDC3C7")))
+        elements.append(Spacer(1, 0.3*cm))
+
+        for chart_path in chart_paths:
+            if os.path.exists(chart_path):
+                elements.append(Image(chart_path, width=16*cm, height=9*cm))
+                elements.append(Spacer(1, 0.5*cm))
+
+    doc.build(elements)
+    return path
 
 db_path, db_name = select_database()
 db = SQLDatabase.from_uri(db_path)

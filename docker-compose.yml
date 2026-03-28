@@ -4,5 +4,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./charts:/app/charts
       - .:/app
+      - ./charts:/app/charts
+      - ./reports:/app/reports
