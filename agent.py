@@ -43,10 +43,16 @@ def select_database():
 @tool
 def create_chart(data_json: str) -> str:
     """
-    IMPORTANT: You MUST use the actual query results as values. Never use example or estimated values.
-    Creates a chart from SQL query results and saves it as a PNG file.
-    Input must be JSON with keys: labels (list of strings), values (list of actual numbers from query results), title (str), xlabel (str), ylabel (str), chart_type (str: 'bar', 'line', 'pie').
-    Example: {"labels": ["A", "B"], "values": [10.5, 20.3], "title": "My Chart", "xlabel": "X", "ylabel": "Y", "chart_type": "bar"}
+    Creates a chart and saves it as PNG. 
+    
+    STRICT RULES - YOU MUST FOLLOW:
+    - Run the SQL query FIRST and get real results
+    - Use ONLY the actual numbers from the SQL query result as 'values'
+    - NEVER use placeholder values like [100, 200] or [10, 20]
+    - If SQL returns [(USA, 2280), (France, 1909)], then values MUST be [2280, 1909]
+    
+    Input JSON format:
+    {"labels": ["actual", "labels"], "values": [actual, numbers], "title": "str", "xlabel": "str", "ylabel": "str", "chart_type": "bar|line|pie"}
     """
     try:
         data       = json.loads(data_json)
@@ -149,11 +155,20 @@ agent = create_sql_agent(
     db=db,
     extra_tools=[create_chart],
     verbose=True,
-    agent_type="openai-tools"
-)
+    agent_type="openai-tools",
+    prefix="""You are a SQL and data visualization expert.
 
-print(f"\n SQL Agent ready! Connected to: {db_name}")
-print("Commands: 'q' quit | 'switch' change database | 'report' export PDF\n")
+MANDATORY CHART WORKFLOW - NEVER SKIP STEPS:
+1. Run sql_db_list_tables to see available tables
+2. Run sql_db_schema to understand table structure  
+3. Write and run the SQL query with sql_db_query
+4. READ the actual query results carefully
+5. Pass the EXACT numbers from step 4 into create_chart values
+
+FORBIDDEN: Using placeholder, estimated, or example values in create_chart.
+If SQL returns [(USA, 2280), (France, 1909)], create_chart values MUST be [2280, 1909].
+"""
+)
 
 while True:
     soru = input("Question: ").strip()
@@ -182,6 +197,7 @@ while True:
         chat_history = []
         chart_paths  = []
         print(f"Switched to: {db_name}\n")
+        
         continue
 
     if not soru:
